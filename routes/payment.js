@@ -5,9 +5,7 @@ const router = express.Router();
 
 router.post('/orders', async (req, res) => {
     try {
-
         const { amount, currency, payment_capture } = req.body;
-        // const amount = 300;
         const instance = new Razorpay({
             key_id: process.env.RAZORPAY_KEY_ID,
             key_secret: process.env.RAZORPAY_SECRET,
