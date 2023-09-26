@@ -24,7 +24,7 @@ router.post('/orders', async (req, res) => {
     }
 });
 
-router.post('/success', async (req, res) => {
+router.post('/verify', async (req, res) => {
     try {
         const {
             orderCreationId,
@@ -32,11 +32,9 @@ router.post('/success', async (req, res) => {
             razorpayOrderId,
             razorpaySignature,
         } = req.body;
-
         const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_SECRET);
         shasum.update(`${orderCreationId}|${razorpayPaymentId}`);
         const digest = shasum.digest('hex');
-
         if (digest !== razorpaySignature)
             return res.status(400).json({ msg: 'Transaction not legit!' });
 
@@ -51,8 +49,9 @@ router.post('/success', async (req, res) => {
 
         await newPayment.save();
 
-        res.json({
+        res.status(200).json({
             msg: 'success',
+            success:true,
             orderId: razorpayOrderId,
             paymentId: razorpayPaymentId,
         });
