@@ -2,6 +2,9 @@ const express = require('express');
 const Razorpay = require('razorpay');
 require("dotenv").config();
 const router = express.Router();
+const Payment = require('../models/paymentModel.js');
+const crypto = require('crypto');
+
 
 router.post('/orders', async (req, res) => {
     try {
@@ -11,7 +14,7 @@ router.post('/orders', async (req, res) => {
             key_secret: process.env.RAZORPAY_SECRET,
         });
         const options = {
-            amount: amount * 100, // amount in the smallest unit.
+            amount: Number(amount * 100), // amount in the smallest unit.
             currency: currency || 'INR',
             payment_capture: payment_capture || 1,
         }
@@ -25,37 +28,33 @@ router.post('/orders', async (req, res) => {
 });
 
 router.post('/verify', async (req, res) => {
+
     try {
-        const {
-            orderCreationId,
-            razorpayPaymentId,
-            razorpayOrderId,
-            razorpaySignature,
-        } = req.body;
-        const shasum = crypto.createHmac('sha256', process.env.RAZORPAY_SECRET);
-        shasum.update(`${orderCreationId}|${razorpayPaymentId}`);
-        const digest = shasum.digest('hex');
-        if (digest !== razorpaySignature)
-            return res.status(400).json({ msg: 'Transaction not legit!' });
+        const { orderCreationId, razorpayPaymentId, razorpayOrderId, razorpaySignature, } = req.body;
 
-        const newPayment = PaymentDetails({
-            razorpayDetails: {
-                orderId: razorpayOrderId,
-                paymentId: razorpayPaymentId,
-                signature: razorpaySignature,
-            },
-            success: true,
-        });
+        const body = razorpayOrderId + "|" + razorpayPaymentId;
 
-        await newPayment.save();
+        const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_SECRET)
+            .update(body.toString())
+            .digest("hex");
+        if (expectedSignature) {
 
-        res.status(200).json({
-            msg: 'success',
-            success:true,
-            orderId: razorpayOrderId,
-            paymentId: razorpayPaymentId,
-        });
+            // Create a new Payment document
+            const payment = new Payment({
+                razorpayOrderId,
+                razorpayPaymentId,
+                razorpaySignature,
+            });
+            // Save the Payment document to the database
+            await payment.save();
+            res.redirect('http://localhost:3000/');
+        }
+        else {
+            res.status(400).json({ msg: 'Transaction not legit!' });
+        }
+
     } catch (error) {
+        console.error("An error occurred:", error);
         res.status(500).send(error);
     }
 });
